@@ -3,11 +3,12 @@ package spark
 import (
 	//	"github.com/liangx8/spark/invoker"
 	"net/http"
+	"regexp"
 )
 // Distrubutor is a options struct.
 // distrubute handler by name string
 /*
-type Parameters map[string]string
+
 type Distributor struct{
 	name string
 	data map[string]Handler
@@ -25,15 +26,40 @@ func (d *Distributor)Name()string{
 	return d.name
 }
 */
+
 type route struct{
 	method ReqMethod
-	pattern string
-	handler []Handler
+	url string
+	handlers []Handler
+}
+
+var urlReg = regexp.MustCompile("^(.*?)\\?")
+func (r *route)match(method ReqMethod,url string) routeMatch {
+	idx:=urlReg.FindStringSubmatchIndex(url)
+	var prefix string
+	if idx == nil {
+		prefix=url
+	} else {
+		prefix=url[idx[2]:idx[3]]
+	}
+	if prefix == r.url {
+		if method == r.method {
+			return exactMatch
+		}
+		if method == ANY {
+			return match
+		}
+		if ANY == r.method {
+			return match
+		}
+	}
+	return noMatch
 }
 type Router struct{
 	routes []*route
 	notFound []Handler
 }
+
 func (r *Router)Get(p string,h ...Handler)*Router{
 	return r.AddRoute(GET,p,h)
 }
@@ -49,8 +75,14 @@ func (r *Router)Delete(p string,h ...Handler)*Router{
 func (r *Router)Any(p string,h ...Handler)*Router{
 	return r.AddRoute(ANY,p,h)
 }
-func (r *Router)AddRoute(method ReqMethod,pattern string,h []Handler)*Router{
-	r.routes = append(r.routes,&route{method,pattern,h})
+func (r *Router)AddRoute(method ReqMethod,url string,h []Handler)*Router{
+	for i,ro := range r.routes {
+		if m :=ro.match(method,url);m == exactMatch {
+			r.routes[i]=&route{method,url,h}
+			return r
+		}
+	}
+	r.routes = append(r.routes,&route{method,url,h})
 	return r
 }
 func (r *Router)NotFound(h ...Handler)*Router{
@@ -58,10 +90,64 @@ func (r *Router)NotFound(h ...Handler)*Router{
 	return r
 }
 
-func (r *Router)handler(c Context,req *http.Request){
-
+func (r *Router)handler(ctx Context,req *http.Request){
+	var rt *route
+	var hs []Handler
+	mm := noMatch
+	for _,ro := range r.routes {
+		m := ro.match(ReqMethod(req.Method),req.URL.Path)
+		if m == exactMatch{
+			rt = ro
+			mm = m
+			break
+		}
+		if m > mm {
+			rt = ro
+			mm = m
+		}
+	}
+	if mm == noMatch {
+		hs = r.notFound[:]
+	} else {
+		hs = rt.handlers[:]
+	}
+	c := &routeContext{ctx,hs,0,nil}
+	ctx.Invoke(func(rh ReturnHandler){
+		if rh == (ReturnHandler)(nil) {
+			c.returnHandler=DefaultReturnHandler
+		} else {
+			c.returnHandler=rh
+		}
+		
+	})
+	c.MapTo(c,(*Context)(nil))
+	c.run()
 }
-
+type routeContext struct{
+	Context
+	handlers []Handler
+	index int
+	returnHandler ReturnHandler
+}
+func (c *routeContext)Next(){
+	c.index ++
+	c.run()
+}
+func (c *routeContext)run(){
+	for c.index < len(c.handlers) {
+		vals := c.Invoke(c.handlers[c.index])
+		if len(vals) > 0 {
+			c.returnHandler(c,vals)
+		}
+		c.index ++
+	}
+}
+type routeMatch int
+const (
+	noMatch routeMatch = iota
+	match
+	exactMatch
+)
 type ReqMethod string
 const (
 	OPTIONS ReqMethod = "OPTIONS"

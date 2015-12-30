@@ -3,6 +3,7 @@ import (
 	"reflect"
 	"net/http"
 
+
 	"github.com/liangx8/spark/invoker"
 )
 // Both middleware and action use this type
@@ -23,7 +24,7 @@ type Spark struct{
 }
 
 func New() *Spark{
-	r := &Router{make([]*route,0),make([]Handler,0)}
+	r := &Router{make([]*route,0),[]Handler{http.NotFound}}
 	
 	spk := &Spark{
 		invoker.New(),
@@ -49,9 +50,6 @@ func (spk *Spark)ServeHTTP(w http.ResponseWriter,r *http.Request){
 	c.MapTo(c,(*Context)(nil))
 	c.run()
 }
-func (spk *Spark)SetAction(h Handler){
-	spk.action=h
-}
 
 
 type Context interface{
@@ -72,13 +70,6 @@ func (c *context)Next(){
 func (c *context)run(){
 	cnt := len(c.handlers)
 
-	if c.index == cnt {
-		vals:=c.Invoke(c.action)
-		if c.returnHandler != nil {
-			c.returnHandler(c,vals)
-		}
-		return
-	}
 	for c.index < cnt {
 		vals:=c.Invoke(c.handlers[c.index])
 		if c.returnHandler != nil {
@@ -89,8 +80,18 @@ func (c *context)run(){
 			return
 		}
 	}
+	if c.index == cnt {
+
+		vals:=c.Invoke(c.action)
+		if len(vals) > 0 {
+			if c.returnHandler != nil {
+				c.returnHandler(c,vals)
+			}
+		}
+		return
+	}
 	if c.index > cnt {
-		panic("do not use Context.Next() in action handler")
+		panic("Never reach here")
 	}
 }
 var DoNothing Handler = func(){}
