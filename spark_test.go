@@ -80,7 +80,7 @@ func expected_ok(t *testing.T,r io.Reader,expect string){
 			t.Fatalf("%s",greeting)
 		}
 	} else {
-		t.Fatalf("expected %s",expect)
+		t.Fatalf("expected '%s' but '%s'",expect,greeting)
 	}
 }
 

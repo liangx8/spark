@@ -2,7 +2,7 @@ package spark
 
 import (
 	"net/http"
-	"fmt"
+
 )
 type Params map[string]string
 // when use this. *http.Request.Body would be touch. can read other content data anymore
@@ -13,7 +13,6 @@ func ParamsHandler(c Context,req *http.Request){
 	}
 
 	for k,v := range req.Form{
-		fmt.Println(k,v)
 		if len(v)>0 {
 			vals[k]=v[0]
 		}

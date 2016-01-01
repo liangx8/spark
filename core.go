@@ -24,7 +24,7 @@ type Spark struct{
 }
 
 func New() *Spark{
-	r := &Router{make([]*route,0),[]Handler{http.NotFound}}
+	r := &Router{make([]*route,0),[]Handler{NotFound}}
 	
 	spk := &Spark{
 		invoker.New(),
@@ -34,6 +34,7 @@ func New() *Spark{
 		func()*Router{return r},
 	}
 	spk.MapTo(spk.log,(*Logger)(nil))
+	spk.Use(DefaultLogHandler)
 	spk.Use(Recovery())
 	return spk
 }
@@ -44,17 +45,23 @@ func (spk *Spark)Use(h Handler){
 func (spk *Spark)ServeHTTP(w http.ResponseWriter,r *http.Request){
 
 	c:=&context{invoker.New(),spk.handlers,spk.action,0,nil}
-	c.Map(w)
+	c.MapTo(&ResponseWriter{w,http.StatusOK},(*http.ResponseWriter)(nil))
 	c.Map(r)
 	c.SetParent(spk)
 	c.MapTo(c,(*Context)(nil))
 	c.run()
 }
-
+func (spk *Spark)RunAt(addr string){
+	http.ListenAndServe(addr,spk)
+}
+func (spk *Spark)Run(){
+	spk.RunAt(":8080")
+}
 
 type Context interface{
 	invoker.Invoker
 	Next()
+	OnReturn([] reflect.Value)
 }
 type context struct{
 	invoker.Invoker
@@ -62,6 +69,11 @@ type context struct{
 	action Handler
 	index int
 	returnHandler ReturnHandler
+}
+func (c *context)OnReturn(vals []reflect.Value){
+	if c.returnHandler != nil {
+		c.returnHandler(c,vals)
+	}
 }
 func (c *context)Next(){
 	c.index ++
@@ -84,14 +96,20 @@ func (c *context)run(){
 
 		vals:=c.Invoke(c.action)
 		if len(vals) > 0 {
-			if c.returnHandler != nil {
-				c.returnHandler(c,vals)
-			}
+			c.OnReturn(vals)
 		}
 		return
 	}
 	if c.index > cnt {
 		panic("Never reach here")
 	}
+}
+type ResponseWriter struct{
+	http.ResponseWriter
+	Status int
+}
+func (w *ResponseWriter)WriteHeader(status int){
+	w.Status = status
+	w.ResponseWriter.WriteHeader(status)
 }
 var DoNothing Handler = func(){}

@@ -1,31 +1,12 @@
 package spark
 
 import (
-	//	"github.com/liangx8/spark/invoker"
 	"net/http"
 	"regexp"
-)
-// Distrubutor is a options struct.
-// distrubute handler by name string
-/*
+	"reflect"
 
-type Distributor struct{
-	name string
-	data map[string]Handler
-}
-func NewDistributor(name string)*Distributor{
-	return &Distributor{
-		name:name,
-		data:make(map[string]Handler),
-	}
-}
-func (d *Distributor)Handler(c Context,key string){
-	handler,ok := d.data[key]
-}
-func (d *Distributor)Name()string{
-	return d.name
-}
-*/
+	"github.com/liangx8/spark/invoker"
+)
 
 type route struct{
 	method ReqMethod
@@ -90,7 +71,8 @@ func (r *Router)NotFound(h ...Handler)*Router{
 	return r
 }
 
-func (r *Router)handler(ctx Context,req *http.Request){
+func (r *Router)handler(ctx Context,req *http.Request,rh ReturnHandler){
+
 	var rt *route
 	var hs []Handler
 	mm := noMatch
@@ -111,23 +93,26 @@ func (r *Router)handler(ctx Context,req *http.Request){
 	} else {
 		hs = rt.handlers[:]
 	}
-	c := &routeContext{ctx,hs,0,nil}
-	ctx.Invoke(func(rh ReturnHandler){
-		if rh == (ReturnHandler)(nil) {
-			c.returnHandler=DefaultReturnHandler
-		} else {
-			c.returnHandler=rh
-		}
-		
-	})
+	c := &routeContext{invoker.New(),hs,0,nil}
+	c.SetParent(ctx)
+	if rh == (ReturnHandler)(nil) {
+		c.returnHandler=DefaultReturnHandler
+	} else {
+		c.returnHandler=rh
+	}
 	c.MapTo(c,(*Context)(nil))
 	c.run()
 }
 type routeContext struct{
-	Context
+	invoker.Invoker
 	handlers []Handler
 	index int
 	returnHandler ReturnHandler
+}
+func (c *routeContext)OnReturn(vals []reflect.Value){
+	if c.returnHandler != nil {
+		c.returnHandler(c,vals)
+	}
 }
 func (c *routeContext)Next(){
 	c.index ++
@@ -136,9 +121,7 @@ func (c *routeContext)Next(){
 func (c *routeContext)run(){
 	for c.index < len(c.handlers) {
 		vals := c.Invoke(c.handlers[c.index])
-		if len(vals) > 0 {
-			c.returnHandler(c,vals)
-		}
+		c.OnReturn(vals)
 		c.index ++
 	}
 }
