@@ -8,7 +8,7 @@ import (
 
 func DefaultHandler()spark.Handler{
 	var sc sessionContext
-	sc.data=make(map[string]*sessionImpl)
+	sc = make(sessionContext)
 	return func(c spark.Context,w http.ResponseWriter,r *http.Request,l spark.Logger){
 		sessionCookie,err := r.Cookie(sessionReqName)
 

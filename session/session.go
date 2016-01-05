@@ -8,22 +8,29 @@ import (
 	"github.com/liangx8/spark"
 )
 
-type sessionContext struct{
-	data map[string]*sessionImpl
-}
+type sessionContext map[string]*sessionImpl
+
 
 func (sc *sessionContext)getOrNew(id string,log spark.Logger)Session{
-	s,ok := sc.data[id]
+	s,ok := (*sc)[id]
 	if ok {
 		return s
 	}
+	id = fmt.Sprint(time.Now().UnixNano())
 	s = &sessionImpl{
-		id:fmt.Sprint(time.Now().UnixNano()),
+		returnId:func()string{return id},
 		data:make(map[string]interface{}),
-		expire:time.NewTimer(15 * time.Minute),
+		expire:time.AfterFunc(15 * time.Minute,func(){
+			delete(*sc,id)
+			log.Infof("session %s expires",id)	
+		}),
+		removeFromContext:func(){
+			delete(*sc,id)
+			log.Infof("session %s invalidate",id)
+		},
 	}
-	sc.data[s.id]=s
-	log.Infof("Create a new session %s",s.id)	
+	(*sc)[id]=s
+	log.Infof("Create a new session %s",id)	
 	return s
 }
 
@@ -42,14 +49,16 @@ type Session interface{
 
 type sessionImpl struct {
 	sync.Mutex
-	id string
 	data map[string]interface{}
 	expire *time.Timer
+	removeFromContext func()
+	returnId func()string
 //	valid bool
 }
 
 func (s *sessionImpl)Invalidate(){
 	s.expire.Stop()
+	s.removeFromContext()
 }
 func (s *sessionImpl)Get(key string) (interface{},error){
 
@@ -70,7 +79,7 @@ func (s *sessionImpl)Set(key string,value interface{})error{
 }
 
 func (s *sessionImpl)Id()string{
-	return s.id
+	return s.returnId()
 }
 
 //func (s *sessionImpl)

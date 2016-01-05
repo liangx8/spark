@@ -8,31 +8,51 @@ import (
 )
 // Both middleware and action use this type
 
-type Handler interface{}
+type (
+	Handler interface{}
 
+	Spark struct{
+		invoker.Invoker
+		handlers []Handler
+		action Handler
+		log Logger
+		GetRouter func()*Router
+	}
+
+	Context interface{
+		invoker.Invoker
+		Next()
+		OnReturn([] reflect.Value)
+	}
+	context struct{
+		invoker.Invoker
+		handlers []Handler
+		action Handler
+		index int
+		returnHandler ReturnHandler
+	}
+
+	ResponseWriter struct{
+		http.ResponseWriter
+		Status int
+	}
+)
 func validate(h Handler){
 	if reflect.TypeOf(h).Kind() != reflect.Func {
 		panic("Handler must be a function")
 	}
-}
-type Spark struct{
-	invoker.Invoker
-	handlers []Handler
-	action Handler
-	log Logger
-	GetRouter func()*Router
 }
 
 func New() *Spark{
 	r := &Router{make([]*route,0),[]Handler{NotFound}}
 	
 	spk := &Spark{
-		invoker.New(),
-		make([]Handler,0),
-		r.handler,
-		DefaultLogger(),
-		func()*Router{return r},
+		handlers:make([]Handler,0),
+		action:r.handler,
+		log:DefaultLogger(),
+		GetRouter:func()*Router{return r},
 	}
+	spk.Invoker=invoker.New()
 	spk.MapTo(spk.log,(*Logger)(nil))
 	spk.Use(DefaultLogHandler)
 	spk.Use(Recovery())
@@ -56,19 +76,6 @@ func (spk *Spark)RunAt(addr string){
 }
 func (spk *Spark)Run(){
 	spk.RunAt(":8080")
-}
-
-type Context interface{
-	invoker.Invoker
-	Next()
-	OnReturn([] reflect.Value)
-}
-type context struct{
-	invoker.Invoker
-	handlers []Handler
-	action Handler
-	index int
-	returnHandler ReturnHandler
 }
 func (c *context)OnReturn(vals []reflect.Value){
 	if c.returnHandler != nil {
@@ -103,10 +110,6 @@ func (c *context)run(){
 	if c.index > cnt {
 		panic("Never reach here")
 	}
-}
-type ResponseWriter struct{
-	http.ResponseWriter
-	Status int
 }
 func (w *ResponseWriter)WriteHeader(status int){
 	w.Status = status

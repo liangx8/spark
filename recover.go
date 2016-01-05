@@ -122,7 +122,7 @@ func Recovery() Handler {
 
 				var body []byte
 
-				res.Header().Set("Content-Type", "text/html")
+				res.Header().Set("Content-Type", "text/html; charset=utf-8")
 				body = []byte(fmt.Sprintf(panicHtml, err, err, stack))
 
 

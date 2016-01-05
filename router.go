@@ -8,12 +8,25 @@ import (
 	"github.com/liangx8/spark/invoker"
 )
 
-type route struct{
-	method ReqMethod
-	url string
-	handlers []Handler
-}
-
+type(
+	route struct{
+		method ReqMethod
+		url string
+		handlers []Handler
+	}
+	Router struct{
+		routes []*route
+		notFound []Handler
+	}
+	routeContext struct{
+		invoker.Invoker
+		handlers []Handler
+		index int
+		returnHandler ReturnHandler
+	}
+	routeMatch int
+	ReqMethod string
+)
 var urlReg = regexp.MustCompile("^(.*?)\\?")
 func (r *route)match(method ReqMethod,url string) routeMatch {
 	idx:=urlReg.FindStringSubmatchIndex(url)
@@ -35,10 +48,6 @@ func (r *route)match(method ReqMethod,url string) routeMatch {
 		}
 	}
 	return noMatch
-}
-type Router struct{
-	routes []*route
-	notFound []Handler
 }
 
 func (r *Router)Get(p string,h ...Handler)*Router{
@@ -103,12 +112,6 @@ func (r *Router)handler(ctx Context,req *http.Request,rh ReturnHandler){
 	c.MapTo(c,(*Context)(nil))
 	c.run()
 }
-type routeContext struct{
-	invoker.Invoker
-	handlers []Handler
-	index int
-	returnHandler ReturnHandler
-}
 func (c *routeContext)OnReturn(vals []reflect.Value){
 	if c.returnHandler != nil {
 		c.returnHandler(c,vals)
@@ -125,13 +128,12 @@ func (c *routeContext)run(){
 		c.index ++
 	}
 }
-type routeMatch int
+
 const (
 	noMatch routeMatch = iota
 	match
 	exactMatch
 )
-type ReqMethod string
 const (
 	OPTIONS ReqMethod = "OPTIONS"
 	GET     ReqMethod = "GET"
