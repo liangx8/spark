@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-
 	"net/http"
 	"runtime"
-
+	"log"
 )
 
 const (
@@ -112,11 +111,11 @@ func function(pc uintptr) []byte {
 // Recovery returns a middleware that recovers from any panics and writes a 500 if there was one.
 // While Martini is in development mode, Recovery will also output the panic as HTML.
 func Recovery() Handler {
-	return func(c Context,log Logger, res http.ResponseWriter) {
+	return func(c Context,l *log.Logger, res http.ResponseWriter) {
 		defer func() {
 			if err := recover(); err != nil {
 				stack := stack(3)
-				log.Errorf("PANIC: %s\n%s", err, stack)
+				l.Printf("PANIC: %s\n%s", err, stack)
 
 
 

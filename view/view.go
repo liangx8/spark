@@ -34,14 +34,19 @@ func ViewReturnHandlerRenderMaker(m RenderMaker) spark.ReturnHandler{
 		var v *View
 		var reterr error
 		for _,val := range vals {
-			if val.Kind() == reflect.Interface {
+			switch val.Kind() {
+			case reflect.Interface:
 				if val.Type().Name() == "error" {
-					if !val.IsNil(){
+					if !val.IsNil() {
 						reterr = val.Interface().(error)
 					}
 				}
-			} else {
-				v = val.Interface().(*View)
+			case reflect.Ptr:
+				var ok bool
+				v, ok = val.Interface().(*View)
+				if !ok {
+					return
+				}
 			}
 		}
 		if reterr != nil {

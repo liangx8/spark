@@ -2,6 +2,7 @@ package invoker_test
 
 import (
 	"testing"
+
 	
 	"github.com/liangx8/spark/invoker"
 )
@@ -10,7 +11,11 @@ type iface interface{
 }
 type struc struct{}
 func (struc)Int() int {	return 100 }
-
+type struc2 struct{
+	struc
+}
+func (struc2)Int() int { return 200 }
+	
 
 func Test_invoker(t *testing.T){
 	ink := invoker.New()
@@ -51,6 +56,7 @@ func Test_builintype(t *testing.T){
 	ink1:=invoker.New()
 	ink1.SetParent(ink)
 	ink1.Invoke(f)
+	ink = invoker.New()
 }
 
 func expectedValue(t *testing.T,expected,but interface{}){

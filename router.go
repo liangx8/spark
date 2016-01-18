@@ -5,28 +5,26 @@ import (
 	"regexp"
 	"reflect"
 
-	"github.com/liangx8/spark/invoker"
+//	"github.com/liangx8/spark/invoker"
 )
 
 type(
 	route struct{
 		method ReqMethod
 		url string
-		handlers []Handler
+		handler Handler
 	}
 	Router struct{
 		routes []*route
-		notFound []Handler
 	}
-	routeContext struct{
-		invoker.Invoker
-		handlers []Handler
-		index int
-		returnHandler ReturnHandler
-	}
+
 	routeMatch int
 	ReqMethod string
 )
+func newRouter() *Router{
+	return &Router{make([]*route,0)}
+}
+// regexp that retrive substring from 0 to char '?'
 var urlReg = regexp.MustCompile("^(.*?)\\?")
 func (r *route)match(method ReqMethod,url string) routeMatch {
 	idx:=urlReg.FindStringSubmatchIndex(url)
@@ -50,22 +48,22 @@ func (r *route)match(method ReqMethod,url string) routeMatch {
 	return noMatch
 }
 
-func (r *Router)Get(p string,h ...Handler)*Router{
+func (r *Router)Get(p string,h Handler)*Router{
 	return r.AddRoute(GET,p,h)
 }
-func (r *Router)Post(p string,h ...Handler)*Router{
+func (r *Router)Post(p string,h Handler)*Router{
 	return r.AddRoute(POST,p,h)
 }
-func (r *Router)Put(p string,h ...Handler)*Router{
+func (r *Router)Put(p string,h Handler)*Router{
 	return r.AddRoute(PUT,p,h)
 }
-func (r *Router)Delete(p string,h ...Handler)*Router{
+func (r *Router)Delete(p string,h Handler)*Router{
 	return r.AddRoute(DELETE,p,h)
 }
-func (r *Router)Any(p string,h ...Handler)*Router{
+func (r *Router)Any(p string,h Handler)*Router{
 	return r.AddRoute(ANY,p,h)
 }
-func (r *Router)AddRoute(method ReqMethod,url string,h []Handler)*Router{
+func (r *Router)AddRoute(method ReqMethod,url string,h Handler)*Router{
 	for i,ro := range r.routes {
 		if m :=ro.match(method,url);m == exactMatch {
 			r.routes[i]=&route{method,url,h}
@@ -75,15 +73,12 @@ func (r *Router)AddRoute(method ReqMethod,url string,h []Handler)*Router{
 	r.routes = append(r.routes,&route{method,url,h})
 	return r
 }
-func (r *Router)NotFound(h ...Handler)*Router{
-	r.notFound = h
-	return r
-}
 
-func (r *Router)handler(ctx Context,req *http.Request,rh ReturnHandler){
+func (r *Router)handler(ctx Context,rh ReturnHandler){
 
 	var rt *route
-	var hs []Handler
+	req := ctx.Get(reflect.TypeOf((*http.Request)(nil))).Interface().(*http.Request)
+
 	mm := noMatch
 	for _,ro := range r.routes {
 		m := ro.match(ReqMethod(req.Method),req.URL.Path)
@@ -98,34 +93,9 @@ func (r *Router)handler(ctx Context,req *http.Request,rh ReturnHandler){
 		}
 	}
 	if mm == noMatch {
-		hs = r.notFound[:]
+		ctx.Invoke(rh(http.StatusNotFound,nil))
 	} else {
-		hs = rt.handlers[:]
-	}
-	c := &routeContext{invoker.New(),hs,0,nil}
-	c.SetParent(ctx)
-	if rh == (ReturnHandler)(nil) {
-		c.returnHandler=DefaultReturnHandler
-	} else {
-		c.returnHandler=rh
-	}
-	c.MapTo(c,(*Context)(nil))
-	c.run()
-}
-func (c *routeContext)OnReturn(vals []reflect.Value){
-	if c.returnHandler != nil {
-		c.returnHandler(c,vals)
-	}
-}
-func (c *routeContext)Next(){
-	c.index ++
-	c.run()
-}
-func (c *routeContext)run(){
-	for c.index < len(c.handlers) {
-		vals := c.Invoke(c.handlers[c.index])
-		c.OnReturn(vals)
-		c.index ++
+		ctx.Invoke(rh(http.StatusOK,ctx.Invoke(rt.handler)))
 	}
 }
 

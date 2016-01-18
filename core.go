@@ -2,74 +2,56 @@ package spark
 import (
 	"reflect"
 	"net/http"
-
+	"log"
 
 	"github.com/liangx8/spark/invoker"
+	"os"
 )
-// Both middleware and action use this type
+
 
 type (
 	Handler interface{}
-
 	Spark struct{
 		invoker.Invoker
 		handlers []Handler
-		action Handler
-		log Logger
-		GetRouter func()*Router
+		action func(Context,ReturnHandler)
+		log log.Logger
 	}
 
 	Context interface{
 		invoker.Invoker
 		Next()
-		OnReturn([] reflect.Value)
+
 	}
 	context struct{
 		invoker.Invoker
 		handlers []Handler
-		action Handler
+		action func(Context,ReturnHandler)
 		index int
-		returnHandler ReturnHandler
 	}
 
-	ResponseWriter struct{
+	responseWriter struct{
 		http.ResponseWriter
 		Status int
 	}
 )
-func validate(h Handler){
-	if reflect.TypeOf(h).Kind() != reflect.Func {
-		panic("Handler must be a function")
-	}
-}
-
-func New() *Spark{
-	r := &Router{make([]*route,0),[]Handler{NotFound}}
-	
-	spk := &Spark{
-		handlers:make([]Handler,0),
-		action:r.handler,
-		log:DefaultLogger(),
-		GetRouter:func()*Router{return r},
-	}
-	spk.Invoker=invoker.New()
-	spk.MapTo(spk.log,(*Logger)(nil))
-	spk.Use(DefaultLogHandler)
-	spk.Use(Recovery())
-	return spk
-}
-func (spk *Spark)Use(h Handler){
-	validate(h)
-	spk.handlers = append(spk.handlers,h)
-}
-func (spk *Spark)ServeHTTP(w http.ResponseWriter,r *http.Request){
-
-	c:=&context{invoker.New(),spk.handlers,spk.action,0,nil}
-	c.MapTo(&ResponseWriter{w,http.StatusOK},(*http.ResponseWriter)(nil))
-	c.Map(r)
-	c.SetParent(spk)
-	c.MapTo(c,(*Context)(nil))
+func (c *context)Next(){
+	c.index ++
 	c.run()
+}
+func (c *context)run(){
+	count := len(c.handlers)
+	for c.index < count {
+		c.Invoke(c.handlers[c.index])
+		c.index ++
+	}
+	if c.index > count {return}
+	c.Invoke(c.action)
+}
+// use a middleware
+func (spk *Spark)Use(mw Handler){
+	check(mw)
+	spk.handlers = append(spk.handlers,mw)
 }
 func (spk *Spark)RunAt(addr string){
 	http.ListenAndServe(addr,spk)
@@ -77,42 +59,45 @@ func (spk *Spark)RunAt(addr string){
 func (spk *Spark)Run(){
 	spk.RunAt(":8080")
 }
-func (c *context)OnReturn(vals []reflect.Value){
-	if c.returnHandler != nil {
-		c.returnHandler(c,vals)
+func check(h Handler){
+	if reflect.TypeOf(h).Kind() != reflect.Func {
+		panic("Handler must be a function")
 	}
 }
-func (c *context)Next(){
-	c.index ++
-	c.run()
+func New() *Spark{
+	router:=newRouter()
+	
+	spk := &Spark{
+		handlers:make([]Handler,0),
+		action:func(c Context,rh ReturnHandler){
+			// execute a NotFound response by default
+			c.Invoke(rh(http.StatusNotFound,nil))
+		},
+	}
+	spk.action=router.handler
+	spk.Invoker=invoker.New()
+	spk.Use(Recovery())
+	spk.Use(DefaultLogHandler)
+	spk.Map(log.New(os.Stdout,"[spark] ",log.LstdFlags))
+	spk.Map(ReturnHandler(defaultReturnHandler))
+	return spk
 }
-func (c *context)run(){
-	cnt := len(c.handlers)
+// implement http.HandlerFunc
+func (spk *Spark)ServeHTTP(w http.ResponseWriter,r *http.Request){
+	ctx := &context{
+		handlers:spk.handlers,
+		action:spk.action,
+		index:0,
+	}
+	ctx.Invoker = invoker.New()
+	ctx.SetParent(spk)
+	ctx.Map(r)
+	ctx.MapTo(&responseWriter{w,http.StatusOK},(*http.ResponseWriter)(nil))
 
-	for c.index < cnt {
-		vals:=c.Invoke(c.handlers[c.index])
-		if c.returnHandler != nil {
-			c.returnHandler(c,vals)
-		}
-		c.index ++
-		if c.index > cnt {
-			return
-		}
-	}
-	if c.index == cnt {
-
-		vals:=c.Invoke(c.action)
-		if len(vals) > 0 {
-			c.OnReturn(vals)
-		}
-		return
-	}
-	if c.index > cnt {
-		panic("Never reach here")
-	}
+	ctx.MapTo(ctx,(*Context)(nil))
+	ctx.run()
 }
-func (w *ResponseWriter)WriteHeader(status int){
+func (w *responseWriter)WriteHeader(status int){
 	w.Status = status
 	w.ResponseWriter.WriteHeader(status)
 }
-var DoNothing Handler = func(){}

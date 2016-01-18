@@ -5,7 +5,7 @@ import (
 
 )
 type Params map[string]string
-// when use this. *http.Request.Body would be touch. can read other content data anymore
+// when use this. *http.Request.Body would be touch.
 func ParamsHandler(c Context,req *http.Request){
 	vals := make(map[string]string)
 	if err:=req.ParseForm();err != nil {

@@ -2,7 +2,7 @@ package spark
 import (
 	"testing"
 	"regexp"
-	"net/http"
+//	"net/http"
 
 )
 
@@ -20,7 +20,7 @@ func Test_re(t *testing.T){
 }
 
 func Test_router_add(t *testing.T){
-	r := &Router{make([]*route,0),[]Handler{http.NotFound}}
+	r := &Router{make([]*route,0)}
 	r.Get("/aaa",func(){})
 	expectedValue(t,1,len(r.routes))
 	expectedValue(t,r.routes[0].match(ANY,"/aaa"),match)
