@@ -2,10 +2,8 @@ package spark
 import (
 	"reflect"
 	"net/http"
-	"log"
 
 	"github.com/liangx8/spark/invoker"
-	"os"
 )
 const MAXINT = int((^uint(0)) >> 1)
 
@@ -90,7 +88,7 @@ func New() *Spark{
 	spk.Invoker=invoker.New()
 	spk.Use(DefaultLogHandler)
 	spk.Use(Recovery())
-	spk.Map(log.New(os.Stdout,"[spark] ",log.LstdFlags))
+	spk.Map(DefaultLog())
 	spk.Map(ReturnHandler(defaultReturnHandler))
 	return spk
 }

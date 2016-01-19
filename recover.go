@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
-	"log"
 )
 
 const (
@@ -110,13 +109,13 @@ func function(pc uintptr) []byte {
 
 // Recovery returns a middleware that recovers from any panics and writes a 500 if there was one.
 func Recovery() Handler {
-	return func(c Context,l *log.Logger, res http.ResponseWriter) (ok bool){
+	return func(c Context,l LogAdaptor, res http.ResponseWriter) (ok bool){
 		ok = true
 		defer func() {
 			if err := recover(); err != nil {
 
 				stack := stack(3)
-				l.Printf("PANIC: %s\n%s", err, stack)
+				l(INFO,"PANIC: %s\n%s", err, stack)
 
 				var body []byte
 
