@@ -109,29 +109,26 @@ func function(pc uintptr) []byte {
 }
 
 // Recovery returns a middleware that recovers from any panics and writes a 500 if there was one.
-// While Martini is in development mode, Recovery will also output the panic as HTML.
 func Recovery() Handler {
-	return func(c Context,l *log.Logger, res http.ResponseWriter) {
+	return func(c Context,l *log.Logger, res http.ResponseWriter) (ok bool){
+		ok = true
 		defer func() {
 			if err := recover(); err != nil {
+
 				stack := stack(3)
 				l.Printf("PANIC: %s\n%s", err, stack)
-
-
 
 				var body []byte
 
 				res.Header().Set("Content-Type", "text/html; charset=utf-8")
 				body = []byte(fmt.Sprintf(panicHtml, err, err, stack))
 
-
 				res.WriteHeader(http.StatusInternalServerError)
-				if nil != body {
-					res.Write(body)
-				}
+				res.Write(body)
+				ok = false
 			}
 		}()
-
 		c.Next()
+		return
 	}
 }

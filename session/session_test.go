@@ -1,5 +1,5 @@
 package session_test
-
+/*
 import (
 	"testing"
 	"io"
@@ -90,3 +90,4 @@ func expectEqual(t *testing.T,o1,o2 interface{}){
 	}
 }
 
+*/

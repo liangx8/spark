@@ -7,7 +7,7 @@ import (
 	"github.com/liangx8/spark/invoker"
 	"os"
 )
-
+const MAXINT = int((^uint(0)) >> 1)
 
 type (
 	Handler interface{}
@@ -15,13 +15,12 @@ type (
 		invoker.Invoker
 		handlers []Handler
 		action func(Context,ReturnHandler)
-		log log.Logger
+		GetRouter func()*Router
 	}
-
+	// 在Next()方法包裹的中间件中.如果有返回false值.就会放弃剩下的中间件执行,包括action
 	Context interface{
 		invoker.Invoker
 		Next()
-
 	}
 	context struct{
 		invoker.Invoker
@@ -36,15 +35,29 @@ type (
 	}
 )
 func (c *context)Next(){
-	c.index ++
+	if c.index < MAXINT{
+		c.index ++
+	}
 	c.run()
 }
 func (c *context)run(){
 	count := len(c.handlers)
 	for c.index < count {
-		c.Invoke(c.handlers[c.index])
-		c.index ++
+		vs:=c.Invoke(c.handlers[c.index])
+		if len(vs)>0 {
+
+			// break chain if return is false
+			if vs[0].Kind() == reflect.Bool && !vs[0].Bool() {
+				// set a enough large number to prevent chain continue
+				c.index= MAXINT
+			}
+		}
+		if c.index < MAXINT{
+			c.index ++
+		}
+
 	}
+
 	if c.index > count {return}
 	c.Invoke(c.action)
 }
@@ -69,15 +82,14 @@ func New() *Spark{
 	
 	spk := &Spark{
 		handlers:make([]Handler,0),
-		action:func(c Context,rh ReturnHandler){
-			// execute a NotFound response by default
-			c.Invoke(rh(http.StatusNotFound,nil))
+		GetRouter:func()*Router{
+			return router
 		},
 	}
 	spk.action=router.handler
 	spk.Invoker=invoker.New()
-	spk.Use(Recovery())
 	spk.Use(DefaultLogHandler)
+	spk.Use(Recovery())
 	spk.Map(log.New(os.Stdout,"[spark] ",log.LstdFlags))
 	spk.Map(ReturnHandler(defaultReturnHandler))
 	return spk

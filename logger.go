@@ -22,5 +22,5 @@ func DefaultLogHandler(l *log.Logger,w http.ResponseWriter,req *http.Request,c C
 	rw := w.(*responseWriter)
 	c.Next()
 
-	l.Printf("Completed %v %s in %v\n", rw.Status, http.StatusText(rw.Status), time.Since(start))
+	l.Printf("Completed %d %s in %v\n", rw.Status, http.StatusText(rw.Status), time.Since(start))
 }

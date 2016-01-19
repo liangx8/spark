@@ -2,14 +2,16 @@ package session
 
 import (
 	"net/http"
+	"log"
 
 	"github.com/liangx8/spark"
+
 )
 
 func DefaultHandler()spark.Handler{
 	var sc sessionContext
 	sc = make(sessionContext)
-	return func(c spark.Context,w http.ResponseWriter,r *http.Request,l spark.Logger){
+	return func(c spark.Context,w http.ResponseWriter,r *http.Request,l *log.Logger){
 		sessionCookie,err := r.Cookie(sessionReqName)
 
 		if err == http.ErrNoCookie {
@@ -34,3 +36,4 @@ func DefaultHandler()spark.Handler{
 const (
 	sessionReqName = "_gsessionid"
 )
+

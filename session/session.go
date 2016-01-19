@@ -3,79 +3,75 @@ import (
 	"time"
 	"sync"
 	"errors"
-	"fmt"
+	"log"
+)
+var SessionExpire time.Duration
+type (
+	sessionContext map[string]*sessionImpl
 
-	"github.com/liangx8/spark"
+	Session interface{
+//		Lock()
+//		Unlock()
+		// return value for key
+		Get(key string) interface{}
+		// set value
+		Set(key string, value interface{})
+		// return Id
+		Id() string
+		// Invalidate Session
+		Invalidate()
+	}
+
+	sessionImpl struct {
+		sync.Mutex
+		data map[string]interface{}
+		expire *time.Timer
+		removeFromContext func()
+		returnId func()string
+		//	valid bool
+	}
 )
 
-type sessionContext map[string]*sessionImpl
-
-
-func (sc *sessionContext)getOrNew(id string,log spark.Logger)Session{
+func (sc *sessionContext)getOrNew(id string,l *log.Logger)*sessionImpl{
 	s,ok := (*sc)[id]
 	if ok {
-		return s
+		if s.expire.Reset(SessionExpire) {
+			return s
+		}
 	}
-	id = fmt.Sprint(time.Now().UnixNano())
+	id = newSessionId()
 	s = &sessionImpl{
 		returnId:func()string{return id},
 		data:make(map[string]interface{}),
-		expire:time.AfterFunc(15 * time.Minute,func(){
+		expire:time.AfterFunc(SessionExpire,func(){
 			delete(*sc,id)
-			log.Infof("session %s expires",id)	
+			log.Printf("session %s expires",id)	
 		}),
 		removeFromContext:func(){
-			delete(*sc,id)
-			log.Infof("session %s invalidate",id)
+			if s.expire.Stop() {
+				delete(*sc,id)
+				l.Printf("session %s invalidate",id)
+			}
 		},
 	}
 	(*sc)[id]=s
-	log.Infof("Create a new session %s",id)	
+	l.Printf("Create a new session %s",id)	
 	return s
 }
 
-type Session interface{
-	Lock()
-	Unlock()
-	// return value for key or return ErrSessionInvalid
-	Get(key string) (interface{},error)
-	// set value or return ErrSessionInvalid
-	Set(key string, value interface{}) error
-	// return Id
-	Id() string
-	// Invalidate Session
-	Invalidate()
-}
-
-type sessionImpl struct {
-	sync.Mutex
-	data map[string]interface{}
-	expire *time.Timer
-	removeFromContext func()
-	returnId func()string
-//	valid bool
-}
-
 func (s *sessionImpl)Invalidate(){
-	s.expire.Stop()
+
 	s.removeFromContext()
 }
-func (s *sessionImpl)Get(key string) (interface{},error){
+func (s *sessionImpl)Get(key string) interface{}{
 
 	value := s.data[key]
-	if !s.expire.Reset(15 * time.Minute){
-		return nil,ErrSessionInvalid
-	}
-	return value,nil
+	return value
 }
 
-func (s *sessionImpl)Set(key string,value interface{})error{
-
+func (s *sessionImpl)Set(key string,value interface{}){
 	s.data[key]=value
-	if !s.expire.Reset(15 * time.Minute){
-		return ErrSessionInvalid
-	}
-	return nil
+
 }
 
 func (s *sessionImpl)Id()string{
@@ -83,6 +79,29 @@ func (s *sessionImpl)Id()string{
 }
 
 //func (s *sessionImpl)
+
+func newSessionId() string{
+	i := time.Now().UnixNano()
+	buf := make([]byte,0,30)
+
+	v := i % (26 + 26 + 10)
+	for i > 0 {
+		d := (i+v) % (26 + 26 + 10)
+		i = i / (26 + 26 + 10)
+		if d < 10 {
+			buf = append(buf,byte(d + 0x30))
+		} else {
+			d = d - 10
+			if d < 26 {
+				buf = append(buf,byte(d + 0x41))
+			} else {
+				d = d- 26
+				buf = append(buf,byte(d + 0x61))
+			}
+		}
+	}
+	return string(buf)
+}
 
 
 var ErrSessionInvalid = errors.New("Session had been invalided")
