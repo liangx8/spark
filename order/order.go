@@ -70,6 +70,9 @@ func (o *order)NewSequence() Sequence{
 			return true
 		},
 		obj:func()interface{}{
+			if oidx < 0 {
+				panic("Beginning of Sequence Error, you should call Next() first")
+			}
 			return objs[oidx]
 		},
 	}

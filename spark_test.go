@@ -14,7 +14,7 @@ import (
 
 func Test_use(t *testing.T){
 	spk := spark.New()
-	spk.Use(func(w http.ResponseWriter){
+	spk.Use("",func(w http.ResponseWriter){
 		
 	})
 	ts :=httptest.NewServer(spk)
@@ -29,7 +29,7 @@ func Test_use(t *testing.T){
 	res.Body.Close()
 	ts.Close()
 	spk = spark.New()
-	spk.Use(func(w http.ResponseWriter){
+	spk.Use("",func(w http.ResponseWriter){
 		panic("painc")
 	})
 	ts =httptest.NewServer(spk)

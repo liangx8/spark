@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/liangx8/spark/invoker"
+	"github.com/liangx8/spark/order"
 )
 const MAXINT = int((^uint(0)) >> 1)
 
@@ -11,8 +12,9 @@ type (
 	Handler interface{}
 	Spark struct{
 		invoker.Invoker
-		handlers []Handler
-		action func(Context,ReturnHandler)
+		handlers order.Order
+//		handlers []Handler
+//		action func(Context,ReturnHandler)
 		GetRouter func()*Router
 	}
 	// 在Next()方法包裹的中间件中.如果有返回false值.就会放弃剩下的中间件执行,包括action
@@ -22,47 +24,55 @@ type (
 	}
 	context struct{
 		invoker.Invoker
-		handlers []Handler
-		action func(Context,ReturnHandler)
-		index int
+		handlers order.Sequence
+//		action func(Context,ReturnHandler)
+		chainBreak bool
 	}
 
 	responseWriter struct{
 		http.ResponseWriter
 		Status int
 	}
+	/*
+	nameHandler{
+		name string
+		handler Handler
+	}*/
 )
 func (c *context)Next(){
-	if c.index < MAXINT{
-		c.index ++
+	if c.chainBreak { return }
+	if c.handlers.Next() {
+		c.run()
 	}
-	c.run()
 }
 func (c *context)run(){
-	count := len(c.handlers)
-	for c.index < count {
-		vs:=c.Invoke(c.handlers[c.index])
+	for {
+		vs:=c.Invoke(c.handlers.Object())
 		if len(vs)>0 {
 
 			// break chain if return is false
 			if vs[0].Kind() == reflect.Bool && !vs[0].Bool() {
-				// set a enough large number to prevent chain continue
-				c.index= MAXINT
+				// break middleware chain
+				c.chainBreak=true
+				return
 			}
 		}
-		if c.index < MAXINT{
-			c.index ++
-		}
-
+		if c.chainBreak { return }
+		if !c.handlers.Next() { return }
 	}
-
-	if c.index > count {return}
-	c.Invoke(c.action)
 }
-// use a middleware
-func (spk *Spark)Use(mw Handler){
+// use a specified seq middleware
+func (spk *Spark)UseSeq(seq int,name string,mw Handler){
 	check(mw)
-	spk.handlers = append(spk.handlers,mw)
+	spk.handlers.Add(seq,mw)
+}
+// mw middleware
+
+// name name of middleware for logging use
+
+func (spk *Spark)Use(name string,mw Handler){
+	spk.UseSeq(100,name,mw)
+//	spk.handlers = append(spk.handlers,mw)
 }
 func (spk *Spark)RunAt(addr string){
 	http.ListenAndServe(addr,spk)
@@ -79,15 +89,17 @@ func New() *Spark{
 	router:=newRouter()
 	
 	spk := &Spark{
-		handlers:make([]Handler,0),
+		handlers:order.New(),
 		GetRouter:func()*Router{
 			return router
 		},
 	}
-	spk.action=router.handler
+	// add router service to the end of middleware chain
+
 	spk.Invoker=invoker.New()
-	spk.Use(DefaultLogHandler)
-	spk.Use(Recovery())
+	spk.Use("logger",DefaultLogHandler)
+	spk.Use("recovery",Recovery())
+	spk.UseSeq(MAXINT,"action",router.handler)
 	spk.Map(DefaultLog())
 	spk.Map(ReturnHandler(defaultReturnHandler))
 	return spk
@@ -95,9 +107,9 @@ func New() *Spark{
 // implement http.HandlerFunc
 func (spk *Spark)ServeHTTP(w http.ResponseWriter,r *http.Request){
 	ctx := &context{
-		handlers:spk.handlers,
-		action:spk.action,
-		index:0,
+		handlers:spk.handlers.NewSequence(),
+//		action:spk.action,
+		chainBreak:false,
 	}
 	ctx.Invoker = invoker.New()
 	ctx.SetParent(spk)
@@ -105,7 +117,7 @@ func (spk *Spark)ServeHTTP(w http.ResponseWriter,r *http.Request){
 	ctx.MapTo(&responseWriter{w,http.StatusOK},(*http.ResponseWriter)(nil))
 
 	ctx.MapTo(ctx,(*Context)(nil))
-	ctx.run()
+	ctx.Next()
 }
 func (w *responseWriter)WriteHeader(status int){
 	w.Status = status
