@@ -5,6 +5,8 @@ import (
 
 	"github.com/liangx8/spark/invoker"
 	"github.com/liangx8/spark/order"
+
+	netctx "golang.org/x/net/context"
 )
 const MAXINT = int((^uint(0)) >> 1)
 
@@ -12,21 +14,22 @@ type (
 	Handler interface{}
 	Spark struct{
 		invoker.Invoker
+		background netctx.Context
 		handlers order.Order
 //		handlers []Handler
 //		action func(Context,ReturnHandler)
 		GetRouter func()*Router
 	}
-	// 在Next()方法包裹的中间件中.如果有返回false值.就会放弃剩下的中间件执行,包括action
 	Context interface{
 		invoker.Invoker
 		Next()
+		Die()
 	}
 	context struct{
+		netctx.Context
 		invoker.Invoker
 		handlers order.Sequence
-//		action func(Context,ReturnHandler)
-		chainBreak bool
+		cancel func()
 	}
 
 	responseWriter struct{
@@ -39,26 +42,29 @@ type (
 		handler Handler
 	}*/
 )
-func (c *context)Next(){
-	if c.chainBreak { return }
-	if c.handlers.Next() {
-		c.run()
-	}
+func (c *context)Die(){
+	c.cancel()
 }
-func (c *context)run(){
-	for {
-		vs:=c.Invoke(c.handlers.Object())
-		if len(vs)>0 {
+func (c *context)Next(){
+	c.run()
+}
 
-			// break chain if return is false
-			if vs[0].Kind() == reflect.Bool && !vs[0].Bool() {
-				// break middleware chain
-				c.chainBreak=true
-				return
-			}
+func (c *context)run(){
+
+
+	for {
+
+		if !c.handlers.Next() {
+			c.Die()
+			return
 		}
-		if c.chainBreak { return }
-		if !c.handlers.Next() { return }
+		select {
+		case <-c.Done():
+			return
+		default:
+			c.Invoke(c.handlers.Object())
+		}
+
 	}
 }
 // use a specified seq middleware
@@ -89,6 +95,7 @@ func New() *Spark{
 	router:=newRouter()
 	
 	spk := &Spark{
+		background:netctx.Background(),
 		handlers:order.New(),
 		GetRouter:func()*Router{
 			return router
@@ -106,18 +113,19 @@ func New() *Spark{
 }
 // implement http.HandlerFunc
 func (spk *Spark)ServeHTTP(w http.ResponseWriter,r *http.Request){
+	nctx,ctxCancle := netctx.WithCancel(spk.background)
 	ctx := &context{
 		handlers:spk.handlers.NewSequence(),
-//		action:spk.action,
-		chainBreak:false,
+		cancel:ctxCancle,
 	}
+	ctx.Context=nctx
 	ctx.Invoker = invoker.New()
 	ctx.SetParent(spk)
 	ctx.Map(r)
 	ctx.MapTo(&responseWriter{w,http.StatusOK},(*http.ResponseWriter)(nil))
 
 	ctx.MapTo(ctx,(*Context)(nil))
-	ctx.Next()
+	ctx.run()
 }
 func (w *responseWriter)WriteHeader(status int){
 	w.Status = status

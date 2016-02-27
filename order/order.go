@@ -5,8 +5,11 @@ import (
 )
 
 type (
-	// 
+	// 把对象按照给于的 seq 顺序提取 
 	Order interface{
+		// seq 顺序
+
+		// obj 对象
 		Add(seq int, obj interface{})
 		NewSequence() Sequence
 	}
@@ -29,10 +32,10 @@ func New() Order{
 }
 
 func (o *order)Add(seq int,obj interface{}){
-	v,ok := o.objs[seq]
+	eobjs,exists := o.objs[seq]
 	var objs []interface{}
-	if ok {
-		objs = append(v,obj)
+	if exists {
+		objs = append(eobjs,obj)
 	} else {
 		objs = make([]interface{},1)
 		o.IntSlice = append(o.IntSlice,seq)

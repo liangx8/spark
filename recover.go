@@ -109,8 +109,7 @@ func function(pc uintptr) []byte {
 
 // Recovery returns a middleware that recovers from any panics and writes a 500 if there was one.
 func Recovery() Handler {
-	return func(c Context,l LogAdaptor, res http.ResponseWriter) (ok bool){
-		ok = true
+	return func(c Context,l LogAdaptor, res http.ResponseWriter){
 		defer func() {
 			if err := recover(); err != nil {
 
@@ -124,7 +123,7 @@ func Recovery() Handler {
 
 				res.WriteHeader(http.StatusInternalServerError)
 				res.Write(body)
-				ok = false
+				c.Die()// kill spark.Context
 			}
 		}()
 		c.Next()

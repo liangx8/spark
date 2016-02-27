@@ -2,24 +2,24 @@ package order_test
 
 import (
 	"testing"
-	odr "github.com/liangx8/spark/order"
+	"github.com/liangx8/spark/order"
 )
 
 func Test_order(t *testing.T){
-	order := odr.New()
-	seq := order.NewSequence()
+	odr := order.New()
+	seq := odr.NewSequence()
 	if seq.Next() {
 		t.Error("expected a empty Order return false")
 	}
-	order = odr.New()
-	order.Add(10,3)
-	order.Add(9,1)
-	order.Add(10,4)
-	order.Add(8,0)
-	order.Add(9,2)
-	order.Add(10,5)
+
+	odr.Add(10,3)
+	odr.Add(9,1)
+	odr.Add(10,4)
+	odr.Add(8,0)
+	odr.Add(9,2)
+	odr.Add(10,5)
 	
-	seq = order.NewSequence()
+	seq = odr.NewSequence()
 	target := 0
 	if !seq.Next() {
 		t.Error("expected true at first run")

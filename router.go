@@ -94,7 +94,7 @@ func (r *Router)handler(ctx Context,rh ReturnHandler){
 	}
 
 	if mm == noMatch {
-		ctx.Invoke(rh(http.StatusNotFound,nil))
+		ctx.Invoke(rh(http.StatusNotFound,[]reflect.Value{reflect.ValueOf(req.URL.Path)}))
 	} else {
 		ctx.Invoke(rh(http.StatusOK,ctx.Invoke(rt.handler)))
 	}

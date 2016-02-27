@@ -6,8 +6,8 @@ import (
 	"fmt"
 )
 
-	// statusCode is a type of http status define in package "net/http"
-	// data is the reflect value of return of action
+// statusCode is a type of http status define in package "net/http"
+// data is the reflect value of return of action
 type ReturnHandler func(statusCode int,data []reflect.Value)Handler
 
 func defaultReturnHandler(statusCode int,data []reflect.Value)Handler{
