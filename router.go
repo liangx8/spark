@@ -74,7 +74,7 @@ func (r *Router)AddRoute(method ReqMethod,url string,h Handler)*Router{
 	return r
 }
 
-func (r *Router)handler(ctx Context,rh ReturnHandler){
+func (r *Router)handler(ctx Context,rhl *returnHandlerLinked){
 
 	var rt *route
 	req := ctx.Get(reflect.TypeOf((*http.Request)(nil))).Interface().(*http.Request)
@@ -94,9 +94,9 @@ func (r *Router)handler(ctx Context,rh ReturnHandler){
 	}
 
 	if mm == noMatch {
-		ctx.Invoke(rh(http.StatusNotFound,[]reflect.Value{reflect.ValueOf(req.URL.Path)}))
+		ctx.Invoke(rhl.First(http.StatusNotFound,[]reflect.Value{reflect.ValueOf(req.URL.Path)}))
 	} else {
-		ctx.Invoke(rh(http.StatusOK,ctx.Invoke(rt.handler)))
+		ctx.Invoke(rhl.First(http.StatusOK,ctx.Invoke(rt.handler)))
 	}
 }
 

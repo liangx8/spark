@@ -19,6 +19,7 @@ type (
 //		handlers []Handler
 //		action func(Context,ReturnHandler)
 		GetRouter func()*Router
+		rhLinked *returnHandlerLinked
 	}
 	Context interface{
 		invoker.Invoker
@@ -100,6 +101,7 @@ func New() *Spark{
 		GetRouter:func()*Router{
 			return router
 		},
+		rhLinked:newReturnHandlerLinked(),
 	}
 	// add router service to the end of middleware chain
 
@@ -108,8 +110,12 @@ func New() *Spark{
 	spk.Use("recovery",Recovery())
 	spk.UseSeq(MAXINT,"action",router.handler)
 	spk.Map(DefaultLog())
-	spk.Map(ReturnHandler(defaultReturnHandler))
+	spk.Map(spk.rhLinked)
 	return spk
+}
+func (spk *Spark)RegisterReturnHandler(rh ReturnHandler){
+	spk.rhLinked=returnHandlerLinkedInsert(spk.rhLinked,rh)
+	spk.Map(spk.rhLinked)
 }
 // implement http.HandlerFunc
 func (spk *Spark)ServeHTTP(w http.ResponseWriter,r *http.Request){
