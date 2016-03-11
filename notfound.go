@@ -34,8 +34,10 @@ background-color: #ffffff;
 </html>`
 )
 
-func NotFound(w http.ResponseWriter,r *http.Request){
-	w.WriteHeader(http.StatusNotFound)
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(noFoundHtml))
+func NotFound(res string)Handler{
+	return func(w http.ResponseWriter,r *http.Request){
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(noFoundHtml))
+	}
 }

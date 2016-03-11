@@ -41,7 +41,12 @@ func (rhl *returnHandlerLinked)Next() ReturnHandlerChain{
 
 func defaultReturnHandler(statusCode int,data []reflect.Value,chain ReturnHandlerChain)Handler{
 	if statusCode == http.StatusNotFound {
-		return NotFound
+		// expected a reflect value of string or panic
+		return NotFound(data[0].String())
+	}
+	if statusCode == http.StatusInternalServerError {
+		// expecting return value are a single reflect value of error
+		return InternalError(data[0].Interface().(error))
 	}
 	count := len(data)
 	if count > 0 {
@@ -56,7 +61,25 @@ func defaultReturnHandler(statusCode int,data []reflect.Value,chain ReturnHandle
 			returnValue=data[0]
 		}
 		if returnStatus == http.StatusNotFound {
-			return NotFound
+			res := ""
+			if count > 1{
+				if data[1].Kind() == reflect.String {
+					res = data[1].String()
+				}
+			}
+			return NotFound(res)
+		}
+		if returnStatus == http.StatusInternalServerError {
+			var err error
+			if count > 1 {
+				var ok bool
+				// expected a reflect value of error
+				err,ok=data[1].Interface().(error)
+				if !ok {
+					return InternalError(nil)
+				}
+			}
+			return InternalError(err)
 		}
 		return func(w http.ResponseWriter){
 			if returnStatus != http.StatusOK {
@@ -71,6 +94,15 @@ func defaultReturnHandler(statusCode int,data []reflect.Value,chain ReturnHandle
 	return doNothing
 }
 func doNothing(){}
+
+func InternalError(err error)Handler{
+	return func(w http.ResponseWriter,r *http.Request){
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "text/html")
+		s:="application error"
+		w.Write([]byte(fmt.Sprintf(errorHtml,s,s,err)))
+	}
+}
 
 
 const errorHtml = `<html>
@@ -98,6 +130,6 @@ background-color: #ffffff;
 </head><body>
 <h1>ERROR</h1>
 <pre style="font-weight: bold;">%s</pre>
-<pre>%s</pre>
+<pre>%v</pre>
 </body>
 </html>`
