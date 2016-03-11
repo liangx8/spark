@@ -1,16 +1,17 @@
 package view
 
 import (
-	"html/template"
+	"io"
 	"reflect"
 	"bytes"
 	"net/http"
 
 	"github.com/liangx8/spark"
+
 )
 
 type (
-	// 还要有 Set-Content 的设置，再想一下怎么设计
+
 	View struct {
 		makeRender func(RenderMaker) Render
 		data interface{}
@@ -29,7 +30,7 @@ func Html(name string,data interface{}) *View {
 	}
 }
 
-func ViewReturnHandler(maker RenderMaker) ReturnHandler{
+func ViewReturnHandler(maker RenderMaker) spark.ReturnHandler{
 	return func(statusCode int,data []reflect.Value,chain spark.ReturnHandlerChain) spark.Handler{
 		if len(data)>0 {
 			v,ok := data[0].Interface().(*View)
@@ -41,7 +42,7 @@ func ViewReturnHandler(maker RenderMaker) ReturnHandler{
 				}
 				return func(w http.ResponseWriter){
 					w.Header().Set("Content-Type",v.contentType)
-					if err:=io.Copy(w,&buf); err != nil {
+					if _,err:=io.Copy(w,&buf); err != nil {
 						panic(err)
 					}
 				}

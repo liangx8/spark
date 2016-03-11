@@ -20,6 +20,7 @@ type (
 //		action func(Context,ReturnHandler)
 		GetRouter func()*Router
 		rhLinked *returnHandlerLinked
+		log LogAdaptor
 	}
 	Context interface{
 		invoker.Invoker
@@ -71,6 +72,7 @@ func (c *context)run(){
 // use a specified seq middleware
 func (spk *Spark)UseSeq(seq int,name string,mw Handler){
 	check(mw)
+	spk.log(INFO,"Use middleware %s at seqence %d",name,seq)
 	spk.handlers.Add(seq,mw)
 }
 // mw middleware
@@ -101,6 +103,7 @@ func New() *Spark{
 		GetRouter:func()*Router{
 			return router
 		},
+		log:DefaultLog(),
 		rhLinked:newReturnHandlerLinked(),
 	}
 	// add router service to the end of middleware chain
@@ -109,9 +112,16 @@ func New() *Spark{
 	spk.Use("logger",DefaultLogHandler)
 	spk.Use("recovery",Recovery())
 	spk.UseSeq(MAXINT,"action",router.handler)
-	spk.Map(DefaultLog())
+	spk.Map(spk.log)
 	spk.Map(spk.rhLinked)
 	return spk
+}
+func (spk *Spark)Start(){
+	spk.StartAt(":8080")
+}
+func (spk *Spark)StartAt(port string){
+	spk.log(INFO,"Server starting at port %s",port)
+	spk.log(ERROR,"starting error",http.ListenAndServe(port,spk))
 }
 func (spk *Spark)RegisterReturnHandler(rh ReturnHandler){
 	spk.rhLinked=returnHandlerLinkedInsert(spk.rhLinked,rh)
