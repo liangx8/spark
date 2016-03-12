@@ -21,6 +21,7 @@ type (
 		TemplateRoot,TemplateError,TemplateNotFound string
 	}
 	// a JSON and XML renderer implements
+	// ByName is not implemented. Do not call
 	TextRenderMaker struct{}
 	renderMakerTemplate struct{
 		RenderMaker
@@ -37,6 +38,7 @@ func (rmt *renderMakerTemplate)ByName(name string) Render{
 		return nil
 	}
 }
+// Do not call me
 func (*TextRenderMaker)ByName(string)Render{
 	panic("do not call me")
 }

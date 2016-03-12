@@ -15,6 +15,7 @@ type (
 	//         http.StatusNotFound,有data[1]并且类型是string,就视为丢失的url,其他忽略
 	//         http.StatusStatusInternalServerError, 有data[1]并且类型是error,就视为出错的内容
 	//   error类型,将会被视为一个内部错误,
+	// 于此同时,如果data中有任何一个值是error类型,也会视为内部错误
 	ReturnHandlerChain func(statusCode int,data []reflect.Value)Handler
 	// statusCode 为http的状态码,现在只有2种返回
 	//  1. URL找不到对应的action, 会被赋予 http.StatusNotFound,data[0] 是一个string类型的url
@@ -69,10 +70,12 @@ func defaultReturnHandler(statusCode int,data []reflect.Value,chain ReturnHandle
 				returnValue = data[1]
 			}
 		} else{
-			err,ok:=data[0].Interface().(error)
-			if ok {
-				if err != nil {
-					return InternalError(err)
+			for _,da:=range data{
+				err,ok:=da.Interface().(error)
+				if ok {
+					if err != nil {
+						return InternalError(err)
+					}
 				}
 			}
 			returnValue=data[0]
