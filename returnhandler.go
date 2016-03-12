@@ -9,7 +9,18 @@ import (
 // statusCode is a type of http status define in package "net/http"
 // data is the reflect value of return of action
 type (
-	ReturnHandlerChain func(int,[]reflect.Value)Handler
+	// 在第三方ReturnHandler调用这个方法时,statusCode 有2中情况.描述如ReturnHandler
+	// 在缺省的ReturnHandler对应data[0]的类型会有以下行为
+	//   int类型,将会被视为statusCode,状态有2种
+	//         http.StatusNotFound,有data[1]并且类型是string,就视为丢失的url,其他忽略
+	//         http.StatusStatusInternalServerError, 有data[1]并且类型是error,就视为出错的内容
+	//   error类型,将会被视为一个内部错误,
+	ReturnHandlerChain func(statusCode int,data []reflect.Value)Handler
+	// statusCode 为http的状态码,现在只有2种返回
+	//  1. URL找不到对应的action, 会被赋予 http.StatusNotFound,data[0] 是一个string类型的url
+	//     同时也可以被第三方的ReturnHandler调用chain指定,这时候,data[0]必须是string类型
+	//  2. 出现错误,会被赋予 http.StatusInternalServerError, 但是,这个状态缺省环境是不会发生,
+	//     在第三方法ReturnHandler中调用了chain可以被指定,这时候,data[0]必须为一个error对象
 	ReturnHandler func(statusCode int,data []reflect.Value,chain ReturnHandlerChain)Handler
 	returnHandlerLinked struct {
 		rh ReturnHandler
@@ -38,7 +49,7 @@ func (rhl *returnHandlerLinked)Next() ReturnHandlerChain{
 	}
 	return chain
 }
-
+// 缺省的ReturnHandler
 func defaultReturnHandler(statusCode int,data []reflect.Value,chain ReturnHandlerChain)Handler{
 	if statusCode == http.StatusNotFound {
 		// expected a reflect value of string or panic
@@ -58,6 +69,12 @@ func defaultReturnHandler(statusCode int,data []reflect.Value,chain ReturnHandle
 				returnValue = data[1]
 			}
 		} else{
+			err,ok:=data[0].Interface().(error)
+			if ok {
+				if err != nil {
+					return InternalError(err)
+				}
+			}
 			returnValue=data[0]
 		}
 		if returnStatus == http.StatusNotFound {

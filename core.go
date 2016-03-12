@@ -11,6 +11,7 @@ import (
 const MAXINT = int((^uint(0)) >> 1)
 
 type (
+	// Handler的返回定义有一些缺省行为.详细请参考 ReturnHandler和ReturnHandlerChain
 	Handler interface{}
 	Spark struct{
 		invoker.Invoker
