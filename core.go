@@ -95,16 +95,18 @@ func check(h Handler){
 		panic("Handler must be a function")
 	}
 }
-func New() *Spark{
+func NewWithLog(loga LogAdaptor) *Spark{
 	router:=newRouter()
-	
+	if loga == nil {
+		loga=EmptyLogAdaptor
+	}
 	spk := &Spark{
 		background:netctx.Background(),
 		handlers:order.New(),
 		GetRouter:func()*Router{
 			return router
 		},
-		log:DefaultLog(),
+		log:loga,
 		rhLinked:newReturnHandlerLinked(),
 	}
 	// add router service to the end of middleware chain
@@ -116,6 +118,9 @@ func New() *Spark{
 	spk.Map(spk.log)
 	spk.Map(spk.rhLinked)
 	return spk
+}
+func New() *Spark{
+	return NewWithLog(DefaultLog())
 }
 func (spk *Spark)Start(){
 	spk.StartAt(":8080")

@@ -47,3 +47,6 @@ func DefaultLog() LogAdaptor{
 		}
 	}
 }
+var EmptyLogAdaptor LogAdaptor = func(level LogLevel,fmt string, objs ...interface{}){
+	// do nothing
+}
