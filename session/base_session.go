@@ -7,7 +7,6 @@ import (
 )
 type (
 	baseSessionMaker struct{
-		w http.ResponseWriter
 		r *http.Request
 		sessionPool chan map[string]*baseSession
 	}
@@ -22,8 +21,7 @@ func (sm *baseSessionMaker)New() Session{
 	h := <-sm.sessionPool
 	defer func(){sm.sessionPool<- h}()
 	id := UniqueId()
-	cookie:= &http.Cookie{Name:SESSION_COOKIE_NAME,Value:id}
-	http.SetCookie(sm.w,cookie)
+
 	bs:=&baseSession{
 		getId:func()string{return id},
 		pool:make(map[string]reflect.Value),
@@ -62,8 +60,8 @@ func (bs *baseSession)Id() string{
 func BaseSessionInit(){
 	pool :=make(chan map[string]*baseSession,1)
 	pool<- make(map[string]*baseSession)
-	BuildMaker = func(w http.ResponseWriter,r *http.Request) SessionMaker{
-		return &baseSessionMaker{w:w,r:r,sessionPool:pool}
+	BuildMaker = func(r *http.Request) SessionMaker{
+		return &baseSessionMaker{r:r,sessionPool:pool}
 	}
 }
 

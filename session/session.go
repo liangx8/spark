@@ -18,19 +18,28 @@ type (
 	}
 )
 
-var BuildMaker func(http.ResponseWriter,*http.Request) SessionMaker
+var BuildMaker func(*http.Request) SessionMaker
 func Get(w http.ResponseWriter,req *http.Request) Session{
-	maker := BuildMaker(w,req)
+	maker := BuildMaker(req)
 	id := obtainId(req)
 	if id == "" {
-		return maker.New()
+		s := maker.New()
+		setCookie(w,s.Id())
+		return s
 	}
 	s := maker.Get(id)
 	if s != nil {
 		return s
 	}
-	return maker.New()
+	s=maker.New()
+	setCookie(w,s.Id())
+	return s
 }
+func setCookie(w http.ResponseWriter,id string){
+	cookie:= &http.Cookie{Name:SESSION_COOKIE_NAME,Value:id}
+	http.SetCookie(w,cookie)
+}
+
 func obtainId(req *http.Request)string{
 
 	cookie,err:=req.Cookie(SESSION_COOKIE_NAME)
