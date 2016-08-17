@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 
-	"github.com/liangx8/gcloud-helper/gae/session"
+	"github.com/liangx8/spark/session"
 )
 
 func Test_base_session(t *testing.T){
