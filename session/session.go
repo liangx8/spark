@@ -2,6 +2,7 @@ package session
 
 import (
 	"net/http"
+	"golang.org/x/net/context"
 )
 
 type (
@@ -16,7 +17,25 @@ type (
 		//is session id valid ?
 		IsValid(string) bool
 	}
+	key int
+
 )
+const (
+	sessionKey key = iota
+)
+func NewContext(
+	w http.ResponseWriter,
+	r *http.Request,
+	parent context.Context) context.Context{
+	return context.WithValue(parent,sessionKey,Get(w,r))
+}
+func GetSession(ctx context.Context)Session{
+	s,ok:=ctx.Value(sessionKey).(Session)
+	if ok {
+		return s
+	}
+	panic("Not a session context")
+}
 
 var BuildMaker func(*http.Request) SessionMaker
 func Get(w http.ResponseWriter,req *http.Request) Session{
