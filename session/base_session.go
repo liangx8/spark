@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"sync"
 	"reflect"
+
+	"golang.org/x/net/context"
+	"github.com/liangx8/spark"
 )
 type (
 	baseSessionMaker struct{
@@ -57,12 +60,47 @@ func (bs *baseSession)Put(key string, ptr interface{}){
 func (bs *baseSession)Id() string{
 	return bs.getId()
 }
-func BaseSessionInit(){
+
+func CreateSessionChain()func(context.Context,spark.HandleFunc){
 	pool :=make(chan map[string]*baseSession,1)
 	pool<- make(map[string]*baseSession)
-	BuildMaker = func(r *http.Request) SessionMaker{
-		return &baseSessionMaker{r:r,sessionPool:pool}
+	return func(ctx context.Context, chain spark.HandleFunc){
+		w,r,err:=spark.ReadHttpContext(ctx)
+		if err != nil {
+			panic(err)
+		}
+		id := obtainId(r)
+		h:= <-pool
+		defer func(){
+			pool<- h
+		}()
+		s,ok := h[id]
+		if !ok {
+			id = UniqueId()
+			s = &baseSession{
+				pool:make(map[string]reflect.Value),
+				getId:func()string{ return id },
+			}
+			h[id]=s
+		}
+		setCookie(w,s.Id())
+		chain(context.WithValue(ctx,sessionKey,s))
 	}
 }
 
+func obtainId(req *http.Request)string{
 
+	cookie,err:=req.Cookie(SESSION_COOKIE_NAME)
+	if err == http.ErrNoCookie {
+		return ""
+	}
+	return cookie.Value
+}
+func setCookie(w http.ResponseWriter,id string){
+	cookie:= &http.Cookie{Name:SESSION_COOKIE_NAME,Value:id}
+	http.SetCookie(w,cookie)
+}
+
+const (
+	SESSION_COOKIE_NAME = "_pfa_SESSION_ID"
+)

@@ -2,11 +2,14 @@ package spark
 
 import (
 	"net/http"
+	"golang.org/x/net/context"
 )
 
+
+
 type (
-	HandleFunc func(http.ResponseWriter, *http.Request)
-	HandleChain func(w http.ResponseWriter, r *http.Request,chain HandleFunc)
+	HandleFunc func(context.Context)
+	HandleChain func(context.Context,HandleFunc)
 
 	chainLinked struct {
 		handle HandleChain
@@ -14,18 +17,19 @@ type (
 	}
 )
 
-func (cl *chainLinked)first(w http.ResponseWriter,r *http.Request){
-	cl.handle(w,r,cl.moveNext())
+
+func (cl *chainLinked)first(ctx context.Context){
+	cl.handle(ctx,cl.moveNext())
 }
 func (cl *chainLinked)moveNext() HandleFunc{
 	var chain HandleFunc
 	linked := cl
-	chain = func(w http.ResponseWriter,r *http.Request){
+	chain = func(ctx context.Context){
 		if linked.next == nil {
 			return // end of chain
 		}
-		linked = cl.next
-		linked.handle(w,r,chain)
+		linked = linked.next
+		linked.handle(ctx,chain)
 	}
 	return chain
 }
@@ -40,13 +44,16 @@ func (cl *chainLinked)Copy() *chainLinked{
 	}
 	return head
 }
-func (cl *chainLinked)wrap(handle HandleFunc) HandleFunc{
+func wrap(
+	cl        *chainLinked,
+	handle    HandleFunc,
+	f         func(*http.Request)context.Context) http.HandlerFunc{
 	cp := cl.Copy()
-	chainLinkedAppend(cp,func(w http.ResponseWriter,r *http.Request,_ HandleFunc){
-		handle(w,r)
+	chainLinkedAppend(cp,func(ctx context.Context,_ HandleFunc){
+		handle(ctx)
 	})
 	return func(w http.ResponseWriter,r *http.Request){
-		cp.first(w,r)
+		cp.first(HttpContext(w,r,f(r)))
 	}
 }
 func chainLinkedInsert(cl *chainLinked,chain HandleChain) *chainLinked{

@@ -7,15 +7,28 @@ import (
 	"io/ioutil"
 	"fmt"
 
+	"golang.org/x/net/context"
 
+	"github.com/liangx8/spark"
 	"github.com/liangx8/spark/session"
 )
 
 func Test_base_session(t *testing.T){
 
-	session.BaseSessionInit()
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request){
-		s:=session.Get(w,r)
+	spk :=spark.New(func(_ *http.Request)context.Context{
+		return context.Background()
+	})
+	spk.AddChain(session.CreateSessionChain())
+	ts := httptest.NewServer(spk.Handler(func(ctx context.Context){
+		s,err:=session.GetSession(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		w,_,err := spark.ReadHttpContext(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+		t.Log(s.Id())
 		fmt.Fprint(w,s.Id())
 	}))
 	defer ts.Close()
@@ -32,7 +45,7 @@ func Test_base_session(t *testing.T){
 	}
 	sessionId:=res.Cookies()[0].Value
 	sameOrError(t,body,sessionId)
-//	req.AddCookie(res.Cookies()[0])
+	req.AddCookie(res.Cookies()[0])
 	res,err = client.Do(req)
 	body,err = ioutil.ReadAll(res.Body)
 	res.Body.Close()
@@ -50,3 +63,9 @@ func sameOrError(t *testing.T,b []byte,s string){
 		}
 	}
 }
+const data = `this is a test data, 
+adkj;lkfj'llkj;lkdjf;lkasjd;lkfj akelfdjkqwer
+adfklq qwerjkj;lq qwerqwer qewr  rqwerqker  weqrqwer
+jkdjf adsffasdf 
+
+`
