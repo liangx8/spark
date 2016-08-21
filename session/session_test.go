@@ -18,7 +18,8 @@ func Test_base_session(t *testing.T){
 	spk :=spark.New(func(_ *http.Request)context.Context{
 		return context.Background()
 	})
-	spk.AddChain(session.CreateSessionChain())
+	var firstId string
+	spk.AddChain(session.CreateSessionChain(session.SimpleSessionMaker))
 	ts := httptest.NewServer(spk.Handler(func(ctx context.Context){
 		s,err:=session.GetSession(ctx)
 		if err != nil {
@@ -44,6 +45,7 @@ func Test_base_session(t *testing.T){
 		t.Fatal(err)
 	}
 	sessionId:=res.Cookies()[0].Value
+	firstId=sessionId
 	sameOrError(t,body,sessionId)
 	req.AddCookie(res.Cookies()[0])
 	res,err = client.Do(req)
@@ -54,6 +56,7 @@ func Test_base_session(t *testing.T){
 	}
 	sessionId=res.Cookies()[0].Value
 	sameOrError(t,body,sessionId)
+	sameOrError(t,body,firstId)
 }
 func sameOrError(t *testing.T,b []byte,s string){
 	for i,c := range []byte(s) {
