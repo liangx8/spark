@@ -67,3 +67,10 @@ func convert(f HandleFunc,nc func(*http.Request)context.Context)http.HandlerFunc
 var (
 	ErrNotHttpContext=errors.New("Not http context")
 )
+
+func HttpHandleFunc(ctx context.Context, handler http.HandlerFunc) error{
+	w,r,err := ReadHttpContext(ctx)
+	if err != nil { return nil }
+	handler(w,r)
+	return nil
+}
