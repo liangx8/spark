@@ -45,7 +45,7 @@ func (spk *Spark)HandleFunc(pattern string, handle HandleFunc){
 	if spk.head != nil {
 		http.HandleFunc(pattern,wrap(spk.head,handle,spk.newContext))
 	} else {
-		http.HandleFunc(pattern,convert(handle,spk.newContext))
+		http.HandleFunc(pattern,handlerAdapter(handle,spk.newContext))
 	}
 }
 
@@ -54,11 +54,11 @@ func (spk *Spark)Handler(f HandleFunc)http.HandlerFunc{
 		return wrap(spk.head,f,spk.newContext)
 
 	} else {
-		return convert(f,spk.newContext)
+		return handlerAdapter(f,spk.newContext)
 
 	}
 }
-func convert(f HandleFunc,nc func(*http.Request)context.Context)http.HandlerFunc{
+func handlerAdapter(f HandleFunc,nc func(*http.Request)context.Context)http.HandlerFunc{
 	return func(w http.ResponseWriter,r *http.Request){
 		f(HttpContext(w,r,nc(r)))
 	}
