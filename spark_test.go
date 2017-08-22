@@ -12,12 +12,14 @@ import (
 	"github.com/liangx8/spark"
 
 )
-
-func Test_spark(t *testing.T){
-	
-	spk :=spark.New(func(_ *http.Request)context.Context{
+func newTestSpark() *spark.Spark{
+	return spark.New(func(_ *http.Request)context.Context{
 		return context.Background()
 	})
+}
+func Test_spark(t *testing.T){
+	
+	spk := newTestSpark()
 	spk.AddChain(func(ctx context.Context,chain spark.HandleFunc){
 		w,_,err := spark.ReadHttpContext(ctx)
 		if err != nil {
